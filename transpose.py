@@ -1,45 +1,47 @@
-from pynput.keyboard import Key, Controller #module used to emulate keypresses
-import time #module used to give user time to switch to excel sheet after inputting info
-k = Controller() #used to emulate keypresses
-column= input("Enter column letter: ") #example: A, B, C, etc.
-rowstart = int(input("Enter starting row number: ")) #example: 1, 2, 3, etc.
-rowend = int(input("Enter ending row number: ")) #example: 1, 2, 3, etc.
-interval = int(input("Enter blocksize: ")) #this is how many rows to transpose at once, examples: 1, 2, 3, etc.
-r = 1 #this is here to keep track of the destination row
-destcolumn = chr(ord(column)+2) #this is the destination column
-print('Starting in 5 seconds [alt tab to your excel sheet]')
-time.sleep(5) #give user time to switch back to excel
-#for loop in range of some strange algorithm I figured out through some trial and error
-for i in range(interval + rowstart - 1, rowend + 1, interval):
-    #ctrl + g
-    k.press(Key.ctrl)
-    k.type('g')
-    k.release(Key.ctrl)
-    #enter in selection
-    k.type(f'{column}{i}:{column}{i-interval+1}\n')
-    #ctrl c
-    k.press(Key.ctrl)
-    k.type('c')
-    k.release(Key.ctrl)
-    #ctrl g
-    k.press(Key.ctrl)
-    k.type('g')
-    k.release(Key.ctrl)
-    #go to destination row and column
-    k.type(f'{destcolumn}{r}\n')
-    #transpose shortcut
-    k.press(Key.alt)
-    k.type('e')
-    k.release(Key.alt)
-    k.type('s')
-    k.press(Key.alt)
-    k.type('e')
-    k.release(Key.alt)
-    k.type('\n')
-    #remove selection
-    k.press(Key.esc)
-    k.release(Key.esc)
-    #for each transposition, the next one will occurr on the next row
-    r += 1
-#tell the user the program has finished executing
+from openpyxl import Workbook, load_workbook
+from openpyxl.utils import column_index_from_string
+import sys
+
+if len(sys.argv) == 2:
+    filePath = sys.argv[1]
+else:
+    filePath = input("Enter Excel Workbook path: ")
+
+wb = load_workbook(filePath)
+print(f"Available sheets: {wb.sheetnames}")
+ws = wb[input("Enter sheet name [default \"transpose\"]: ") or "transpose"]
+
+geneNameCol = column_index_from_string(
+    input("Enter category name column letter [default B]: ") or "B")
+dataCol = column_index_from_string(
+    input("Enter data column letter [default I]: ") or "I")
+rowStart = int(input("Enter starting row number [default 2]: ") or 2)
+rowEnd = int(input("Enter ending row number: "))
+
+# this is how many rows to transpose at once
+interval = int(input("Enter blocksize: "))
+
+destRow = int(input("Enter destination starting row: "))
+destCol = column_index_from_string(input("Enter destination starting col: "))
+
+input("Close your workbook, then press Enter here: ")
+
+
+def transpose(minRow, maxRow, minCol, maxCol, outRow, outCol):
+    for row in range(minRow, maxRow + 1):
+        for col in range(minCol, maxCol + 1):
+            ws.cell(outRow + col - minCol, outCol + row -
+                    minRow).value = ws.cell(row, col).value
+
+
+for currentRow in range(rowStart, rowEnd + 1, interval):
+    # get category name & copy paste it to transposed data
+    ws.cell(destRow, destCol).value = ws.cell(currentRow, geneNameCol).value
+    # transpose the data assocated with that category name
+    transpose(currentRow, currentRow + interval - 1,
+              dataCol, dataCol, destRow, destCol + 1)
+    # for each transposition, the next one will occurr on the next row
+    destRow += 1
+
+wb.save(filePath)
 print("done")
